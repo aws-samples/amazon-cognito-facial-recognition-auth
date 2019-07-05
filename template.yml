@@ -13,9 +13,9 @@ Metadata:
     LicenseUrl: LICENSE
     ReadmeUrl: README.md
     Labels: ['cognito', 'passwordless', 'authentication', 'rekognition', 'facial', 'recognition', 'auth', 'sample']
-    HomepageUrl: https://github.com/enr1c091/amazon-cognito-facial-recognition-auth/tree/master/backend
-    SemanticVersion: 0.1.1
-    SourceCodeUrl: https://github.com/enr1c091/amazon-cognito-facial-recognition-auth/tree/master/backend
+    HomepageUrl: https://github.com/aws-samples/amazon-cognito-facial-recognition-auth/tree/master/
+    SemanticVersion: 1.0.1
+    SourceCodeUrl: https://github.com/aws-samples/amazon-cognito-facial-recognition-auth/tree/master/
 
 
 Parameters:
