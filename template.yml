@@ -1,0 +1,219 @@
+AWSTemplateFormatVersion : '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Amazon Cognito User Pool with Passwordless Facial Recognition Auth configured
+
+Metadata:
+  AWS::ServerlessRepo::Application:
+    Name: amazon-cognito-passwordless-facial-rekognition-auth
+    Description: >
+      An Amazon Cognito user pool, pre-configured with AWS Lambda triggers to implement passwordless facial recognition auth using Amazon Rekognition
+    Author: Enrico Bergamo
+    SpdxLicenseId: MIT-0
+    LicenseUrl: LICENSE
+    ReadmeUrl: README.md
+    Labels: ['cognito', 'passwordless', 'authentication', 'rekognition', 'facial', 'recognition', 'auth', 'sample']
+    HomepageUrl: https://github.com/enr1c091/amazon-cognito-facial-recognition-auth/tree/master/backend
+    SemanticVersion: 0.1.1
+    SourceCodeUrl: https://github.com/enr1c091/amazon-cognito-facial-recognition-auth/tree/master/backend
+
+
+Parameters:
+  UserPoolName:
+    Type: String
+    Description: The name you want the Amazon Cognito User Pool to be created with
+  CollectionName:
+    Type: String
+    Description: The custom Amazon Rekognition collection to index user faces
+  DocumentUploadBucketName:
+    Type: String
+    Description: The S3 bucket name for uploading custom documents when users sign up
+  SignInUploadBucketName:
+    Type: String
+    Description: The S3 bucket name for uploading user photos when signing in for comparison
+
+Globals:
+  Function:
+    Environment:
+      Variables:
+        COLLECTION_NAME: !Ref CollectionName
+        BUCKET_SIGN_UP: !Ref DocumentUploadBucketName
+
+Resources:
+  IndexFaces:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: rekognition/index-faces/
+      Handler: index-faces.handler
+      Runtime: python3.6
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - rekognition:IndexFaces
+              Resource: "*"
+
+  CreateRekognitionCollectionLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: rekognition/create-collection/
+      Handler: create-collection.handler
+      Runtime: python3.6
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - rekognition:CreateCollection
+                - rekognition:DeleteCollection
+              Resource: "*"
+
+  DefineAuthChallenge:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: cognito-triggers/define-auth-challenge/
+      Handler: define-auth-challenge.handler
+      Runtime: nodejs8.10
+
+  CreateAuthChallenge:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: cognito-triggers/create-auth-challenge/
+      Handler: create-auth-challenge.handler
+      Runtime: nodejs8.10
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource: "*"
+
+  VerifyAuthChallengeResponse:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: cognito-triggers/verify-auth-challenge-response/
+      Handler: verify-auth-challenge-response.handler
+      Runtime: nodejs8.10
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - s3:getObject
+                - rekognition:SearchFacesByImage
+              Resource: "*"
+      
+
+  PreSignUp:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: cognito-triggers/pre-sign-up/
+      Handler: pre-sign-up.handler
+      Runtime: nodejs8.10
+  
+  RekognitionCollection:
+    Type: Custom::CustomResource
+    Properties:
+      ServiceToken: !GetAtt 'CreateRekognitionCollectionLambda.Arn'
+
+  BucketSignUp:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Ref DocumentUploadBucketName    
+
+  BucketSignIn:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Ref SignInUploadBucketName 
+
+  CollectionTable:
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      AttributeDefinitions: 
+        - AttributeName: RekognitionId
+          AttributeType: S
+        - AttributeName: FullName
+          AttributeType: S
+      KeySchema: 
+        - AttributeName: RekognitionId
+          KeyType: HASH
+        - AttributeName: FullName
+          KeyType: RANGE
+      GlobalSecondaryIndexes: 
+        - 
+          IndexName: FullName-index
+          KeySchema: 
+            - AttributeName: FullName
+              KeyType: HASH
+          Projection: 
+            ProjectionType: ALL
+          ProvisionedThroughput: 
+            ReadCapacityUnits: 5
+            WriteCapacityUnits: 5
+      ProvisionedThroughput: 
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      TableName: !Ref CollectionName
+
+  UserPool:
+    Type: "AWS::Cognito::UserPool"
+    Properties:
+      UserPoolName: !Ref UserPoolName
+      Schema:
+        - Name: name
+          AttributeDataType: String
+          Mutable: true
+          Required: true
+        - Name: email
+          AttributeDataType: String
+          Mutable: true
+          Required: true
+        - Name: s3-image-object
+          AttributeDataType: String
+          Mutable: true
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: false
+          RequireNumbers: false
+          RequireSymbols: false
+          RequireUppercase: false
+      UsernameAttributes:
+        - email
+      MfaConfiguration: "OFF"
+      LambdaConfig:
+        CreateAuthChallenge: !GetAtt CreateAuthChallenge.Arn
+        DefineAuthChallenge: !GetAtt DefineAuthChallenge.Arn
+        PreSignUp: !GetAtt PreSignUp.Arn
+        VerifyAuthChallengeResponse: !GetAtt VerifyAuthChallengeResponse.Arn
+
+  UserPoolClient:
+    Type: "AWS::Cognito::UserPoolClient"
+    Properties:
+      ClientName: rekognition-auth-client
+      GenerateSecret: false
+      UserPoolId: !Ref UserPool
+      ExplicitAuthFlows:
+        - CUSTOM_AUTH_FLOW_ONLY
+
+Outputs:
+  RekognitionCollectionArn:
+    Description: The Amazon Rekognition Custom Collection ARN.
+    Value: !GetAtt 'RekognitionCollection.Message'
+  SignUpBucketName:
+    Value: !Ref 'BucketSignUp'
+    Description: Name of the sign up Amazon S3 bucket.
+  SignInBucketName:
+    Value: !Ref 'BucketSignIn'
+    Description: Name of the sign in Amazon S3 bucket.
+  TableName:
+    Value: !Ref 'CollectionTable'
+    Description: Name of the DynamoDB table containing Rekognition metadata for each Cognito user
+  UserPoolId:
+    Value: !Ref 'UserPool'
+    Description: ID of the Cognito User Pool
+  UserPoolWebClientId:
+    Value: !Ref 'UserPoolClient'
+    Description: ID of the Cognito User Pool Client for Front-End Subscription
