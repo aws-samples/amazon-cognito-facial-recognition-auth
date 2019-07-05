@@ -35,7 +35,7 @@ NOTE: To deploy this application _**please pick an AWS Region in which you can u
 
 #### How to deploy the Serverless Application with AWS SAM CLI
 
-1. Clone this repo `git clone https://github.com/enr1c091/amazon-cognito-facial-recognition-auth.git`
+1. Clone this repo `git clone https://github.com/aws-samples/amazon-cognito-facial-recognition-auth.git`
 2. Enter cognito directory: `cd amazon-cognito-facial-recognition-auth`
 3. Install dependencies: `npm install`
 4. Set the following environment variables (all mandatory):
