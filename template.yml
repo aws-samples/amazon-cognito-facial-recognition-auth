@@ -74,14 +74,14 @@ Resources:
     Properties:
       CodeUri: cognito-triggers/define-auth-challenge/
       Handler: define-auth-challenge.handler
-      Runtime: nodejs10.x
+      Runtime: nodejs14.x
 
   CreateAuthChallenge:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: cognito-triggers/create-auth-challenge/
       Handler: create-auth-challenge.handler
-      Runtime: nodejs10.x
+      Runtime: nodejs14.x
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -95,7 +95,7 @@ Resources:
     Properties:
       CodeUri: cognito-triggers/verify-auth-challenge-response/
       Handler: verify-auth-challenge-response.handler
-      Runtime: nodejs10.x
+      Runtime: nodejs14.x
       Policies:
         - Version: "2012-10-17"
           Statement:
@@ -111,7 +111,7 @@ Resources:
     Properties:
       CodeUri: cognito-triggers/pre-sign-up/
       Handler: pre-sign-up.handler
-      Runtime: nodejs10.x
+      Runtime: nodejs14.x
   
   RekognitionCollection:
     Type: Custom::CustomResource
